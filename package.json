@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260404.1",
-    "decap-server": "^3.6.0",
+    "decap-server": "^3.7.0",
     "fast-xml-parser": "^5.5.10",
     "turndown": "^7.2.3"
   }
