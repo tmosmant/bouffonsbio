@@ -2,6 +2,7 @@ export const prerender = false;
 
 import { env } from 'cloudflare:workers';
 import type { APIRoute } from 'astro';
+import { notifyNewsletterSignup } from '../../lib/telegram-notify';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 /** Caractères typiquement utilisés pour du HTML/JS — refusés dans e-mail et nom. */
@@ -21,7 +22,7 @@ function normalizeName(raw: string): string {
 	return raw.trim().replace(/\s+/g, ' ');
 }
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
 	const db = (env as unknown as { NEWSLETTER_DB?: D1Database }).NEWSLETTER_DB;
 
 	if (!db) {
@@ -73,6 +74,10 @@ export const POST: APIRoute = async ({ request }) => {
 			)
 			.bind(email, name, source)
 			.run();
+
+		if (!alreadySubscribed) {
+			await notifyNewsletterSignup(name, email, locals.cfContext?.waitUntil);
+		}
 
 		return json({ ok: true, alreadySubscribed });
 	} catch (err) {

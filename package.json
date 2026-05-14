@@ -12,8 +12,9 @@
     "preview": "astro preview",
     "astro": "astro",
     "generate-types": "wrangler types",
-    "deploy": "astro build && wrangler deploy",
+    "deploy": "astro build && wrangler deploy && node scripts/telegram-notify-deploy.mjs",
     "deploy:oauth": "wrangler deploy -c workers/decap-oauth/wrangler.jsonc",
+    "deploy:weekly-stats": "wrangler deploy -c workers/weekly-umami-stats/wrangler.jsonc",
     "import:wp": "node scripts/import-wordpress.mjs",
     "assign:categories": "node scripts/assign-categories.mjs"
   },

@@ -1,0 +1,16 @@
+{
+	"name": "bouffonsbios-weekly-stats",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-04-03",
+	"observability": {
+		"enabled": true
+	},
+	"triggers": {
+		// Vendredi 18:00 UTC (~20 h heure de Paris été). Ajuster selon tes préférences / fuseau.
+		"crons": ["0 18 * * 5"]
+	},
+	"vars": {
+		"UMAMI_WEBSITE_ID": "b9822651-e872-49a4-ad46-12d9a0c040b1",
+		"UMAMI_API_BASE": "https://api.umami.is/v1"
+	}
+}

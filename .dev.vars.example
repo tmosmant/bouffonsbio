@@ -2,3 +2,7 @@
 # Production : définir les mêmes clés comme *Secrets* sur le worker bouffonsbios (dashboard Cloudflare).
 
 PUBLIC_MAPBOX_ACCESS_TOKEN=
+
+# Optionnel — notif Telegram (newsletter nouvelle inscription ; aligné avec les secrets Workers prod).
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=

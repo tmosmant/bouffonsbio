@@ -49,14 +49,31 @@ En production, le déploiement est déclenché **sur Cloudflare** à chaque push
 | Dépôt | `tmosmant/bouffonsbios` |
 | Branche prod | `main` |
 | Build command | `npm install && npm run build` |
-| Deploy command | `npx wrangler deploy` |
+| Deploy command | `npx wrangler deploy && node scripts/telegram-notify-deploy.mjs` |
 | Racine du projet | `.` (racine du dépôt) |
 
 **Build command** : `npm install` suffit en général pour un dépôt solo (souvent un peu plus rapide que `npm ci`, qui supprime toujours `node_modules` avant de réinstaller). Pour une CI très stricte sur le lockfile, tu peux utiliser `npm ci && npm run build` à la place. Il faut **au moins** une install avant `npm run build` : sans `node_modules`, le build échoue.
 
 Active aussi **Build cache** (*Settings* → *Build* → *Build cache*) pour réutiliser le cache npm (`.npm`) et le cache Astro (`.astro`).
 
-**Variables de build** (même écran, *Build variables* / secrets de build) : ajouter `PUBLIC_MAPBOX_ACCESS_TOKEN` si le build en a besoin. En runtime, la carte utilise surtout la variable **sur le Worker** (voir section Mapbox ci-dessus).
+**Variables de build** (même écran, *Build variables* / secrets de build) : ajouter `PUBLIC_MAPBOX_ACCESS_TOKEN` si le build en a besoin. Pour la **notif Telegram au déploy**, ajoute aussi `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID` (même couple que ci-dessous, exposé uniquement pendant l’étape *Deploy*). En runtime, la carte utilise surtout la variable Mapbox **sur le Worker** (voir section Mapbox ci-dessus).
+
+### Notifications Telegram
+
+Trois canaux : **deploy** (message fixe après `wrangler deploy`), **newsletter** (nouvelle inscription seulement), **rapport Umami hebdomadaire** (vendredi, worker dédié).
+
+| Secret / variable | Où les définir | Rôle |
+|-------------------|----------------|------|
+| `TELEGRAM_BOT_TOKEN` | Build (deploy) + Worker `bouffonsbios` + Worker `bouffonsbios-weekly-stats` | Token du bot ([@BotFather](https://core.telegram.org/bots/tutorial)) |
+| `TELEGRAM_CHAT_ID` | Idem | ID du destinataire ou du groupe (voir *getUpdates* après un message envoyé au bot) |
+| `UMAMI_API_KEY` | Secrets du worker **bouffonsbios-weekly-stats** | Clé API [Umami Cloud](https://umami.is/docs/cloud/api-key) |
+| — | Vars du worker weekly (voir `workers/weekly-umami-stats/wrangler.jsonc`) | `UMAMI_WEBSITE_ID`, `UMAMI_API_BASE` (région, ex. `https://api.umami.is/v1/eu` si nécessaire) |
+
+1. **Déployé** — la commande *Deploy* ci-dessus exécute `scripts/telegram-notify-deploy.mjs`, qui envoie : « CloudFlare a déployé le site. » Si les variables Telegram ne sont pas définies **dans l’étape build**, le script se contente d’un log et quitte avec succès (`npm run deploy` local idem sans tokens).
+2. **Newsletter** — sur le Worker **bouffonsbios** :  
+   `npx wrangler secret put TELEGRAM_BOT_TOKEN`  
+   et `TELEGRAM_CHAT_ID` (variable sensible ou secret selon ton habitude dans le dashboard). Sans ces clés, l’API newsletter ne fait rien de plus.
+3. **Hebdomadaire** — créer dans Cloudflare un worker depuis `workers/weekly-umami-stats/` (`npm run deploy:weekly-stats`). Cron vendredi **18:00 UTC** (≈ 20 h été Paris) dans `workers/weekly-umami-stats/wrangler.jsonc` — adapte selon fuseau ou horaire préféré. Message : fenêtre glissante **7 jours**, pages vues / visiteurs / visites, rebond, **top 5** des URLs, évolution vs la semaine précédente.
 
 Cloudflare fournit en général un **API token** dédié aux builds ; tu n’as pas besoin de `CLOUDFLARE_API_TOKEN` côté GitHub.
 
@@ -74,11 +91,12 @@ Ainsi un push sur `main` met à jour les deux workers. Si tu préfères ne dépl
 ### En local
 
 ```sh
-npm run deploy              # site (build + wrangler à la racine)
+npm run deploy               # site (build + wrangler + notif Telegram deploy si configuré)
 npm run deploy:oauth        # worker OAuth seul
+npm run deploy:weekly-stats # worker rapport Umami vendredi soir (cron)
 ```
 
-En local (`wrangler dev`), copier [`.dev.vars.example`](.dev.vars.example) vers `.dev.vars` (ignoré par Git) pour `PUBLIC_MAPBOX_ACCESS_TOKEN`.
+En local (`wrangler dev`), copier [`.dev.vars.example`](.dev.vars.example) vers `.dev.vars` (ignoré par Git) pour `PUBLIC_MAPBOX_ACCESS_TOKEN` et, pour tester Telegram en local, les clés listées dans l’exemple.
 
 ## Infra Cloudflare
 
@@ -86,6 +104,7 @@ En local (`wrangler dev`), copier [`.dev.vars.example`](.dev.vars.example) vers 
 |---------|----------------|
 | Site + API Astro | `wrangler.jsonc` → worker **bouffonsbios** |
 | OAuth Decap | `workers/decap-oauth/wrangler.jsonc` → **bouffonsbios-oauth** |
+| Rapports Umami → Telegram | `workers/weekly-umami-stats/wrangler.jsonc` → **bouffonsbios-weekly-stats** |
 | Newsletter (D1) | Binding `NEWSLETTER_DB` dans `wrangler.jsonc` ; schéma SQL dans `schema/` |
 
 ## Decap + GitHub en production
@@ -136,8 +155,9 @@ Les **`id`** des liens de navigation doivent rester alignés avec le prop `curre
 |----------|------|
 | `npm run dev` | Serveur de dev Astro |
 | `npm run build` | Build production → `dist/` |
-| `npm run deploy` | Build + `wrangler deploy` (site) |
+| `npm run deploy` | Build + `wrangler deploy` + notif Telegram (si variables présentes) |
 | `npm run deploy:oauth` | Déploie uniquement le worker OAuth |
+| `npm run deploy:weekly-stats` | Déploie le worker rapport Umami (cron vendredi UTC) |
 | `npm run import:wp` | Import WordPress (WXR) → articles Markdown |
 | `npm run assign:categories` | Recalcule les catégories depuis les slugs de fichiers |
 | `npm run generate-types` | `wrangler types` (bindings Worker) |
